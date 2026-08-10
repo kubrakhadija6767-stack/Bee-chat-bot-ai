@@ -1,0 +1,2139 @@
+<!DOCTYPE html>
+<html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">  
+    <meta name="description" content="Bee AI is a free, all-in-one AI assistant for chat, writing help, study support, and AI image generation & editing — powered by Google Gemini.">
+    <meta name="theme-color" content="#0B0C10">
+    <meta property="og:title" content="Bee AI — Your Free All-in-One AI Assistant">
+    <meta property="og:description" content="Chat, write, study, and generate or edit images with Bee AI — a free AI assistant powered by Google Gemini.">
+    <meta property="og:type" content="website">
+    <title>Bee AI — Your Free All-in-One AI Assistant</title>  
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>  
+        :root {
+            --bg-main: #0B0C10;
+            --surface-card: #141620;
+            --surface-card-hover: #1C1F2D;
+            --surface-glass: rgba(20, 22, 32, 0.88);
+            --border-glass: rgba(255, 255, 255, 0.08);
+            --accent-gold: #FFC700;
+            --accent-gold-hover: #FFB000;
+            --accent-gold-gradient: linear-gradient(135deg, #FFD233 0%, #FFA800 100%);
+            --text-primary: #FFFFFF;
+            --text-secondary: #8E92A4;
+            --shadow-glow: 0 0 25px rgba(255, 199, 0, 0.28);
+            --topnav-h: 58px;
+            --bottomnav-h: calc(72px + env(safe-area-inset-bottom));
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px; height: 1px;
+            padding: 0; margin: -1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+            white-space: nowrap;
+            border: 0;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body { 
+            background-color: var(--bg-main); 
+            color: var(--text-primary); 
+            height: 100vh; 
+            height: 100dvh; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+            background-image: radial-gradient(circle at 50% -5%, rgba(255, 199, 0, 0.12) 0%, transparent 55%);
+        }  
+
+        /* Wraps top-nav + screens + bottom-nav so the desktop layout can place it
+           beside the sidebar. Needs its own flex sizing at every breakpoint (not
+           just desktop) — otherwise it grows to fit its content instead of being
+           bounded by the viewport, which breaks .screen-view's internal scrolling. */
+        #app-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            width: 100%;
+        }
+
+        /* ==================== SCREENS ROUTING ==================== */
+        .screen-view {
+            flex: 1;
+            min-height: 0; /* required alongside flex:1 for nested flex scroll containers to actually scroll instead of overflowing hidden ancestors */
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            display: none;
+            flex-direction: column;
+            padding-bottom: var(--bottomnav-h);
+        }
+        .screen-view.active {
+            display: flex;
+            animation: fadeIn 0.25s ease forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ==================== TOP NAVIGATION HEADER ==================== */
+        .top-nav {
+            height: 58px;
+            padding: 0 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+        .nav-icon-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-glass);
+            color: var(--text-primary);
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: all 0.2s ease;
+        }
+        .nav-icon-btn:active { transform: scale(0.92); }
+        .top-nav-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #FFFFFF;
+        }
+        .crown-badge {
+            color: var(--accent-gold);
+            font-size: 1.25rem;
+            cursor: pointer;
+        }
+
+        /* ==================== SIDEBAR DRAWER ==================== */
+        .drawer-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px);
+            z-index: 99; display: none; opacity: 0; transition: opacity 0.3s ease;
+        }
+        .drawer-overlay.show { display: block; opacity: 1; }
+
+        #sidebar { 
+            position: fixed; top: 0; left: -310px; width: 310px; height: 100%; 
+            background: #0d0d14; z-index: 100; transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
+            border-right: 1px solid var(--border-glass); display: flex; flex-direction: column; 
+            padding: 20px; gap: 16px;
+        }
+        #sidebar.open { left: 0; }
+        .sidebar-header { font-size: 1.1rem; font-weight: 800; color: #fff; display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border-glass); }
+        .close-btn { background: none; border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer; }
+        .chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .chat-item-wrapper { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 12px; padding: 4px 8px 4px 12px; }
+        .chat-item-wrapper.active { background: rgba(255, 199, 0, 0.12); border-color: rgba(255, 199, 0, 0.3); }
+        .chat-title-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.88rem; color: var(--text-primary); cursor: pointer; padding: 8px 0; }
+        .chat-item-wrapper.active .chat-title-text { color: var(--accent-gold); font-weight: 600; }
+        .delete-chat-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 6px; border-radius: 8px; font-size: 0.9rem; }
+        .delete-chat-btn:hover { color: #FF453A; background: rgba(255, 69, 58, 0.15); }
+        .clear-all-btn { background: rgba(255, 69, 58, 0.12); color: #FF453A; border: 1px solid rgba(255, 69, 58, 0.3); padding: 12px; border-radius: 12px; font-weight: 700; cursor: pointer; text-align: center; font-size: 0.88rem; }
+
+        /* Desktop-only nav links inside the sidebar (hidden elsewhere — the bottom
+           tab bar handles this navigation on mobile/tablet). */
+        .sidebar-desktop-nav { display: none; flex-direction: column; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--border-glass); margin-bottom: 4px; }
+        .sidebar-nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; color: var(--text-secondary); font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+        .sidebar-nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+        .sidebar-nav-item.active { background: rgba(255, 199, 0, 0.12); color: var(--accent-gold); }
+        .sidebar-nav-item .nav-tab-icon { font-size: 1.05rem; }
+
+        /* ==================== HOME SCREEN DESIGN ==================== */
+        .home-container {
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .user-greeting {
+            text-align: center;
+            margin-top: 4px;
+        }
+        .user-greeting h1 {
+            font-size: 1.55rem;
+            font-weight: 800;
+            color: #FFFFFF;
+        }
+        .user-greeting p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 3px;
+        }
+        .mascot-hero {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px 0;
+        }
+        .mascot-glow {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 199, 0, 0.22) 0%, transparent 70%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            filter: drop-shadow(0 0 20px rgba(255, 199, 0, 0.3));
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .mascot-glow:active { transform: scale(0.94); }
+        .mascot-icon { font-size: 72px; }
+
+        /* Quick Search Bar on Home */
+        .home-search-bar {
+            background: var(--surface-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 28px;
+            padding: 6px 6px 6px 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            transition: border-color 0.2s;
+        }
+        .home-search-bar:hover { border-color: rgba(255, 199, 0, 0.4); }
+        .home-search-bar span {
+            flex: 1;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        .home-search-mic {
+            color: var(--text-secondary);
+            padding: 6px;
+            font-size: 1.1rem;
+        }
+        .home-search-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: var(--accent-gold-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #000;
+            font-weight: 800;
+            box-shadow: var(--shadow-glow);
+        }
+
+        /* 2x2 Feature Cards Grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .feature-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 18px;
+            padding: 16px 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .feature-card:hover {
+            background: var(--surface-card-hover);
+            border-color: rgba(255, 199, 0, 0.4);
+            transform: translateY(-2px);
+        }
+        .feature-icon-box {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: rgba(255, 199, 0, 0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+            color: var(--accent-gold);
+        }
+        .feature-text h4 {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #FFF;
+        }
+        .feature-text p {
+            font-size: 0.73rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        /* Recent Chats Section */
+        .recent-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 6px;
+        }
+        .recent-section-header h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #FFF;
+        }
+        .see-all-link {
+            font-size: 0.82rem;
+            color: var(--accent-gold);
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .recent-chat-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .recent-chat-item {
+            background: var(--surface-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .recent-chat-item:hover { border-color: rgba(255, 199, 0, 0.3); }
+        .recent-chat-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+        .recent-chat-info span {
+            font-size: 0.88rem;
+            color: #FFF;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .recent-chat-time {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* ==================== WRITING & STUDY HELPER SCREENS ==================== */
+        .tool-screen-container {
+            padding: 10px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .tool-hero-card {
+            background: linear-gradient(180deg, #1C1F2D 0%, #13151F 100%);
+            border: 1px solid var(--border-glass);
+            border-radius: 24px;
+            padding: 30px 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .tool-hero-icon {
+            font-size: 64px;
+            margin-bottom: 8px;
+            filter: drop-shadow(0 0 16px rgba(255, 199, 0, 0.3));
+        }
+        .tool-hero-card h2 {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #FFF;
+        }
+        .tool-hero-card p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+        .tool-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .tool-list-item {
+            background: var(--surface-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 18px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .tool-list-item:hover {
+            border-color: rgba(255, 199, 0, 0.4);
+            transform: translateX(4px);
+        }
+        .tool-item-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: rgba(255, 199, 0, 0.12);
+            color: var(--accent-gold);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+        .tool-item-text h4 { font-size: 0.95rem; font-weight: 700; color: #FFF; }
+        .tool-item-text p { font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px; }
+
+        .cta-bottom-btn {
+            width: 100%;
+            height: 54px;
+            background: var(--accent-gold-gradient);
+            color: #000;
+            font-weight: 800;
+            font-size: 1rem;
+            border: none;
+            border-radius: 27px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            cursor: pointer;
+            box-shadow: var(--shadow-glow);
+            transition: transform 0.2s;
+            margin-top: 8px;
+        }
+        .cta-bottom-btn:active { transform: scale(0.97); }
+
+        /* ==================== LIVE CHAT SCREEN ==================== */
+        /* NOTE: no `display` set here on purpose — .screen-view / .screen-view.active
+           control visibility. An ID selector setting display here would always win over
+           those class rules (IDs outrank classes), permanently showing this screen. */
+        #chat-screen {
+            flex-direction: column;
+            /* No explicit height here — .screen-view's flex:1 sizes it correctly.
+               padding-bottom is inherited from .screen-view (var(--bottomnav-h)) so
+               the input box sits above the fixed bottom nav instead of hidden under it. */
+        }
+        #chat { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 16px 16px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 16px; 
+            scroll-behavior: smooth; 
+        }  
+        .suggestions-container { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 4px; scrollbar-width: none; flex-shrink: 0; }
+        .suggestions-container::-webkit-scrollbar { display: none; }
+        .chip { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-glass); color: var(--text-primary); padding: 8px 14px; border-radius: 20px; font-size: 0.82rem; font-weight: 600; white-space: nowrap; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .chip:hover { border-color: var(--accent-gold); }
+
+        .msg-row { display: flex; align-items: flex-start; gap: 8px; max-width: 90%; animation: fadeIn 0.25s ease forwards; }
+        .msg-row.user-row { align-self: flex-end; flex-direction: row-reverse; }
+        .msg-row.bot-row { align-self: flex-start; }
+        .avatar { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 800; flex-shrink: 0; margin-top: 2px; }
+        .bot-avatar { background: var(--accent-gold); color: #000; box-shadow: 0 2px 10px rgba(255,199,0,0.25); }
+        .user-avatar { background: rgba(255, 255, 255, 0.12); color: #fff; border: 1px solid var(--border-glass); }
+        .msg { padding: 12px 16px; border-radius: 18px; line-height: 1.5; font-size: 0.93rem; word-wrap: break-word; box-shadow: 0 4px 16px rgba(0,0,0,0.25); }  
+        .user { background: var(--accent-gold-gradient); color: #000000; font-weight: 600; border-bottom-right-radius: 4px; }  
+        .bot { background: var(--surface-card); color: var(--text-primary); border: 1px solid var(--border-glass); border-bottom-left-radius: 4px; }  
+        
+        .msg code { background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #FFC700; }
+        .msg pre { background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; overflow-x: auto; margin: 8px 0; font-family: monospace; border: 1px solid var(--border-glass); }
+        .msg pre code { background: none; padding: 0; color: #fff; }
+        .rendered-img { width: 100%; max-width: 300px; border-radius: 14px; margin-top: 8px; border: 1px solid var(--border-glass); display: block; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+        .download-btn-overlay { margin-top: 8px; background: rgba(16, 185, 129, 0.2); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.4); padding: 8px 14px; font-size: 0.78rem; border-radius: 10px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+        .msg-download-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .msg-download-actions .download-btn-overlay { margin-top: 0; }
+
+        .input-wrapper { background: var(--surface-glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 10px 14px 14px 14px; border-top: 1px solid var(--border-glass); flex-shrink: 0; }
+        
+        /* PHOTO ATTACHMENT PREVIEW (no manual editing controls — edits happen by asking in chat) */
+        #preview-box { display: none; background: #13131c; padding: 12px; border-radius: 16px; border: 1px solid var(--border-glass); margin-bottom: 10px; }
+        .preview-container { display: flex; gap: 12px; align-items: center; }
+        #image-preview { height: 64px; width: 64px; object-fit: cover; border-radius: 12px; border: 2px solid var(--accent-gold); box-shadow: 0 4px 12px rgba(0,0,0,0.5); flex-shrink: 0; }
+        .preview-hint { flex: 1; font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; }
+        .clear-img { background: rgba(255, 59, 48, 0.15); color: #FF453A; border: 1px solid rgba(255, 59, 48, 0.3); padding: 8px 12px; font-size: 11px; border-radius: 8px; cursor: pointer; font-weight: 700; flex-shrink: 0; }
+
+        .input-area { display: flex; gap: 8px; align-items: center; width: 100%; max-width: 850px; margin: 0 auto; }  
+        .icon-btn-premium { 
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+            border: 1px solid rgba(255, 255, 255, 0.14); 
+            color: var(--text-primary); 
+            border-radius: 14px; 
+            width: 42px; 
+            height: 42px; 
+            cursor: pointer; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            flex-shrink: 0; 
+            transition: all 0.2s ease;
+        }
+        .icon-btn-premium:hover { border-color: rgba(255, 199, 0, 0.5); background: rgba(255, 199, 0, 0.1); }
+        .icon-btn-premium.recording { background: #FF453A; color: white; border-color: transparent; box-shadow: 0 0 16px rgba(255,69,58,0.6); animation: pulse 1.2s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        .icon-btn-svg { width: 20px; height: 20px; fill: currentColor; }
+        .pill-input-container { flex: 1; min-width: 0; display: flex; align-items: center; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-glass); border-radius: 28px; padding: 3px 4px 3px 14px; }
+        .pill-input-container:focus-within { border-color: rgba(255, 199, 0, 0.5); background: rgba(255, 255, 255, 0.08); }
+        input[type="text"] { flex: 1; min-width: 0; background: transparent; border: none; color: #ffffff; outline: none; font-size: 0.92rem; height: 38px; }  
+        input[type="text"]::placeholder { color: var(--text-secondary); }
+        .send-btn { background: var(--accent-gold-gradient); color: #000; width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: var(--shadow-glow); margin-left: 6px; }
+        .svg-send { width: 16px; height: 16px; fill: #000; }
+
+        /* ==================== BOTTOM NAVIGATION BAR ==================== */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: var(--bottomnav-h);
+            background: var(--surface-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid var(--border-glass);
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            z-index: 50;
+            padding: 0 10px env(safe-area-inset-bottom) 10px;
+        }
+        .nav-tab {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.72rem;
+            font-weight: 600;
+            transition: color 0.2s;
+            width: 60px;
+        }
+        .nav-tab.active { color: var(--accent-gold); }
+        .nav-tab-icon { font-size: 1.3rem; }
+
+        .center-hive-btn {
+            width: 54px;
+            height: 54px;
+            border-radius: 18px;
+            background: var(--accent-gold-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            box-shadow: var(--shadow-glow);
+            cursor: pointer;
+            transform: translateY(-12px);
+            border: 4px solid var(--bg-main);
+            transition: transform 0.2s ease;
+        }
+        .center-hive-btn:active { transform: translateY(-12px) scale(0.92); }
+
+        /* ==================== STARTER / ONBOARDING SCREEN ==================== */
+        .onboarding-overlay {
+            position: fixed; inset: 0; z-index: 500;
+            background-color: var(--bg-main);
+            background-image: radial-gradient(circle at 50% -5%, rgba(255, 199, 0, 0.14) 0%, transparent 55%);
+            display: flex; align-items: center; justify-content: center;
+            padding: 24px;
+        }
+        .onboarding-card {
+            width: 100%; max-width: 380px;
+            background: var(--surface-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 24px;
+            padding: 32px 26px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .onboarding-step { display: none; flex-direction: column; gap: 14px; text-align: center; }
+        .onboarding-step.active { display: flex; animation: fadeIn 0.3s ease forwards; }
+        .ob-mascot { font-size: 56px; filter: drop-shadow(0 0 16px rgba(255, 199, 0, 0.3)); }
+        .onboarding-step h1 { font-size: 1.3rem; font-weight: 800; color: #fff; }
+        .onboarding-step p { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; }
+        .ob-input {
+            width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass);
+            color: #fff; border-radius: 14px; padding: 14px 16px; font-size: 0.95rem; outline: none;
+            text-align: center;
+        }
+        .ob-input:focus { border-color: rgba(255, 199, 0, 0.5); }
+        .ob-input::placeholder { color: var(--text-secondary); }
+        .ob-choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .ob-choice {
+            background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); color: #fff;
+            border-radius: 16px; padding: 16px 8px; font-size: 0.82rem; font-weight: 700;
+            cursor: pointer; transition: all 0.2s ease; line-height: 1.6;
+        }
+        .ob-choice:hover { border-color: rgba(255, 199, 0, 0.4); }
+        .ob-choice.selected { background: rgba(255, 199, 0, 0.14); border-color: var(--accent-gold); color: var(--accent-gold); }
+        .ob-permission-list { display: flex; flex-direction: column; gap: 10px; }
+        .ob-permission-row {
+            display: flex; align-items: center; gap: 12px;
+            background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass);
+            border-radius: 16px; padding: 12px 14px; text-align: left;
+        }
+        .ob-permission-icon { font-size: 1.4rem; flex-shrink: 0; }
+        .ob-permission-info { flex: 1; min-width: 0; }
+        .ob-permission-info strong { display: block; font-size: 0.85rem; color: #fff; }
+        .ob-permission-info span { display: block; font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px; }
+        .ob-permission-btn {
+            flex-shrink: 0; background: rgba(255, 199, 0, 0.14); border: 1px solid var(--accent-gold);
+            color: var(--accent-gold); font-weight: 700; font-size: 0.75rem;
+            border-radius: 10px; padding: 8px 12px; cursor: pointer; transition: all 0.2s ease; min-width: 68px;
+        }
+        .ob-permission-btn:active { transform: scale(0.94); }
+        .ob-permission-btn.granted { background: rgba(48, 209, 88, 0.14); border-color: #30D158; color: #30D158; cursor: default; }
+        .ob-permission-btn.denied { background: rgba(255, 69, 58, 0.14); border-color: #FF453A; color: #FF453A; }
+        .ob-skip-link { background: none; border: none; color: var(--text-secondary); font-size: 0.8rem; text-decoration: underline; cursor: pointer; padding: 4px; }
+
+        /* ==================== DESKTOP FRAME (tablet/small-desktop preview) ==================== */
+        @media (min-width: 640px) {
+            html { background: #05060a; }
+            body {
+                max-width: 480px;
+                margin: 0 auto;
+                border-left: 1px solid var(--border-glass);
+                border-right: 1px solid var(--border-glass);
+                box-shadow: 0 0 90px rgba(0,0,0,0.65);
+            }
+            .bottom-nav { max-width: 480px; left: 50%; transform: translateX(-50%); }
+            #sidebar { max-width: 340px; }
+            .onboarding-overlay { position: fixed; }
+        }
+
+        /* ==================== FULL DESKTOP LAYOUT ====================
+           At real desktop widths, drop the "phone in a frame" look entirely:
+           the sidebar becomes a permanent left-hand column (no drawer/overlay),
+           the bottom tab bar is replaced by nav links inside that sidebar, and
+           content is centered with a comfortable reading width instead of being
+           squeezed into a 480px column. */
+        @media (min-width: 1024px) {
+            body {
+                max-width: none;
+                margin: 0;
+                border: none;
+                box-shadow: none;
+                flex-direction: row;
+                align-items: stretch;
+            }
+
+            /* Sidebar: permanent column instead of a sliding overlay drawer */
+            #sidebar {
+                position: static;
+                max-width: none;
+                width: 300px;
+                flex-shrink: 0;
+                height: 100%;
+                border-right: 1px solid var(--border-glass);
+            }
+            .drawer-overlay { display: none !important; }
+            #sidebar .close-btn[aria-label="Close menu"] { display: none; }
+
+            .sidebar-desktop-nav { display: flex !important; }
+
+            /* Main column (top nav + active screen) sits beside the sidebar */
+            #app-main {
+                flex: 1;
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+                height: 100dvh;
+                overflow: hidden;
+            }
+
+            .top-nav { padding: 0 32px; height: 66px; border-bottom: 1px solid var(--border-glass); }
+            .nav-icon-btn[aria-label="Menu"] { display: none; } /* sidebar is always visible — no need to toggle it */
+            .top-nav-title { font-size: 1.2rem; }
+
+            .bottom-nav { display: none; } /* navigation now lives in the sidebar */
+            .screen-view { padding-bottom: 32px; }
+
+            .home-container { max-width: 820px; margin: 0 auto; width: 100%; padding: 24px 40px 0; gap: 26px; }
+            .mascot-glow { width: 168px; height: 168px; }
+            .mascot-icon { font-size: 84px; }
+            .features-grid { grid-template-columns: repeat(4, 1fr); }
+            .feature-card { padding: 20px 16px; }
+
+            .tool-screen-container { max-width: 820px; margin: 0 auto; width: 100%; padding: 24px 40px 0; }
+
+            #chat-screen { height: 100%; flex: 1; padding-bottom: 0; }
+            #chat { padding: 28px 40px; max-width: 860px; margin: 0 auto; width: 100%; }
+            .msg-row { max-width: 65%; }
+
+            .input-wrapper { padding: 14px 40px 24px; }
+            #preview-box { max-width: 820px; margin: 0 auto 10px; }
+
+            .onboarding-overlay { position: fixed; }
+        }
+    </style>  
+</head>  
+<body>  
+
+<!-- ==================== STARTER / ONBOARDING SCREEN ==================== -->
+<div class="onboarding-overlay" id="onboarding-screen">
+    <div class="onboarding-card">
+        <div class="onboarding-step active" id="ob-step-1">
+            <div class="ob-mascot">🐝</div>
+            <h1>Welcome to Bee AI!</h1>
+            <p>Let's get to know you a little before we start.</p>
+            <label for="ob-name" class="sr-only">Your name</label>
+            <input type="text" id="ob-name" class="ob-input" placeholder="What should I call you?" maxlength="30" onkeydown="if(event.key==='Enter'){event.preventDefault();obNext(1);}">
+            <button class="cta-bottom-btn" onclick="obNext(1)"><span>Continue</span><span>→</span></button>
+        </div>
+        <div class="onboarding-step" id="ob-step-2">
+            <h1>What brings you here?</h1>
+            <p>Pick what you're most excited about — you can explore everything later.</p>
+            <div class="ob-choice-grid" id="ob-interest-grid">
+                <button type="button" class="ob-choice" onclick="obSelect(this,'interest','writing')">✏️<br>Writing Help</button>
+                <button type="button" class="ob-choice" onclick="obSelect(this,'interest','study')">🎓<br>Study Helper</button>
+                <button type="button" class="ob-choice" onclick="obSelect(this,'interest','chat')">💬<br>Everyday Chat</button>
+                <button type="button" class="ob-choice" onclick="obSelect(this,'interest','images')">🎨<br>AI Images</button>
+            </div>
+            <button class="cta-bottom-btn" onclick="obNext(2)"><span>Continue</span><span>→</span></button>
+        </div>
+        <div class="onboarding-step" id="ob-step-3">
+            <h1>Almost done!</h1>
+            <p>Which language would you like Bee AI to reply in by default?</p>
+            <div class="ob-choice-grid" id="ob-lang-grid">
+                <button type="button" class="ob-choice" onclick="obSelect(this,'lang','auto')">🌐<br>Auto-detect</button>
+                <button type="button" class="ob-choice" onclick="obSelect(this,'lang','english')">🇬🇧<br>English</button>
+                <button type="button" class="ob-choice" onclick="obSelect(this,'lang','urdu')">🇵🇰<br>Urdu</button>
+            </div>
+            <button class="cta-bottom-btn" onclick="obNext(3)"><span>Continue</span><span>→</span></button>
+        </div>
+        <div class="onboarding-step" id="ob-step-4">
+            <div class="ob-mascot">🐝</div>
+            <h1>Tell us a bit more</h1>
+            <p>A few fun questions so Bee AI can personalize things for you.</p>
+            <label for="ob-awesome-name" class="sr-only">Your awesome name</label>
+            <input type="text" id="ob-awesome-name" class="ob-input" placeholder="What's your awesome name?" maxlength="30">
+            <label for="ob-color" class="sr-only">Your favourite colour</label>
+            <input type="text" id="ob-color" class="ob-input" placeholder="What's your favourite colour?" maxlength="20">
+            <label for="ob-food" class="sr-only">Your favourite food</label>
+            <input type="text" id="ob-food" class="ob-input" placeholder="What's your favourite food?" maxlength="30">
+            <label for="ob-country" class="sr-only">Your country</label>
+            <input type="text" id="ob-country" class="ob-input" placeholder="Which country are you from?" maxlength="40">
+            <label for="ob-city" class="sr-only">Favourite city and country</label>
+            <input type="text" id="ob-city" class="ob-input" placeholder="Favourite city & country to visit?" maxlength="60">
+            <button class="cta-bottom-btn" onclick="obNext(4)"><span>Continue</span><span>→</span></button>
+        </div>
+        <div class="onboarding-step" id="ob-step-5">
+            <div class="ob-mascot">🔐</div>
+            <h1>Enable permissions</h1>
+            <p>Bee AI works best with a few permissions. Allow what you're comfortable with — you can change these anytime later.</p>
+            <div class="ob-permission-list">
+                <div class="ob-permission-row">
+                    <div class="ob-permission-icon">📍</div>
+                    <div class="ob-permission-info">
+                        <strong>Location</strong>
+                        <span id="ob-perm-location-status">For local, relevant answers</span>
+                    </div>
+                    <button type="button" class="ob-permission-btn" id="ob-perm-location-btn" onclick="requestObPermission('location')">Allow</button>
+                </div>
+                <div class="ob-permission-row">
+                    <div class="ob-permission-icon">🎙️</div>
+                    <div class="ob-permission-info">
+                        <strong>Microphone</strong>
+                        <span id="ob-perm-mic-status">For voice messages</span>
+                    </div>
+                    <button type="button" class="ob-permission-btn" id="ob-perm-mic-btn" onclick="requestObPermission('mic')">Allow</button>
+                </div>
+                <div class="ob-permission-row">
+                    <div class="ob-permission-icon">📷</div>
+                    <div class="ob-permission-info">
+                        <strong>Camera</strong>
+                        <span id="ob-perm-camera-status">To scan & ask about images</span>
+                    </div>
+                    <button type="button" class="ob-permission-btn" id="ob-perm-camera-btn" onclick="requestObPermission('camera')">Allow</button>
+                </div>
+            </div>
+            <button class="cta-bottom-btn" onclick="finishOnboarding()"><span>Start Using Bee AI</span><span>🐝</span></button>
+            <button type="button" class="ob-skip-link" onclick="finishOnboarding()">Skip for now</button>
+        </div>
+    </div>
+</div>
+
+<!-- SIDEBAR DRAWER -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="toggleSidebar()"></div>
+<div id="sidebar">
+    <div class="sidebar-header">
+        <span>Chat History</span>
+        <div style="display:flex; gap:6px;">
+            <button class="close-btn" aria-label="Start a new chat" title="New Chat" onclick="startNewChat()">＋</button>
+            <button class="close-btn" aria-label="Close menu" onclick="toggleSidebar()">✕</button>
+        </div>
+    </div>
+    <button class="cta-bottom-btn" style="height:44px; font-size:0.9rem;" onclick="startNewChat()">
+        <span>＋ New Chat</span>
+    </button>
+    <div class="sidebar-desktop-nav" id="sidebar-desktop-nav">
+        <div class="sidebar-nav-item active" id="side-tab-home" role="button" tabindex="0" onclick="switchScreen('home-screen')" onkeydown="if(event.key==='Enter')switchScreen('home-screen')">
+            <span class="nav-tab-icon" aria-hidden="true">🏠</span><span>Home</span>
+        </div>
+        <div class="sidebar-nav-item" id="side-tab-tools" role="button" tabindex="0" onclick="switchScreen('writing-screen')" onkeydown="if(event.key==='Enter')switchScreen('writing-screen')">
+            <span class="nav-tab-icon" aria-hidden="true">🛠️</span><span>Writing Tools</span>
+        </div>
+        <div class="sidebar-nav-item" id="side-tab-study" role="button" tabindex="0" onclick="switchScreen('study-screen')" onkeydown="if(event.key==='Enter')switchScreen('study-screen')">
+            <span class="nav-tab-icon" aria-hidden="true">📚</span><span>Study Helper</span>
+        </div>
+    </div>
+    <div class="chat-list" id="chat-list" role="list" aria-label="Chat history"></div>
+    <button class="clear-all-btn" aria-label="Clear all chat history" onclick="clearAllChats()">🗑️ Clear All History</button>
+</div>
+
+<!-- MAIN APP COLUMN (top nav + screens + bottom nav) — sits beside the sidebar on desktop -->
+<div id="app-main">
+<!-- TOP NAV HEADER -->
+<div class="top-nav">
+    <button class="nav-icon-btn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+    <div class="top-nav-title" id="nav-title">Bee AI</div>
+    <div style="display:flex; align-items:center; gap:8px;">
+        <button class="nav-icon-btn" onclick="startNewChat()" aria-label="Start a new chat" title="New Chat">＋</button>
+        <div class="crown-badge" title="Bee AI PRO">👑</div>
+    </div>
+</div>
+
+<!-- ==================== SCREEN 1: HOME DASHBOARD ==================== -->
+<div class="screen-view active" id="home-screen">
+    <div class="home-container">
+        <!-- User Greeting (hidden until the bee mascot is tapped) -->
+        <div class="user-greeting" id="user-greeting" style="display:none;">
+            <h1 id="greeting-name">Hello there 👋</h1>
+            <p id="greeting-sub">How can I help you today?</p>
+        </div>
+
+        <!-- 3D Mascot Hero Graphic -->
+        <div class="mascot-hero">
+            <div class="mascot-glow" id="mascot-toggle" role="button" tabindex="0" aria-expanded="false" aria-label="Show greeting and quick ask bar" onclick="toggleGreeting()" onkeydown="if(event.key==='Enter')toggleGreeting()">
+                <span class="mascot-icon">🐝</span>
+            </div>
+        </div>
+
+        <!-- Quick Ask Search Bar (hidden until the bee mascot is tapped) -->
+        <div class="home-search-bar" id="home-search-bar" style="display:none;" onclick="openChatWithPrompt('')">
+            <span>Ask me anything...</span>
+            <span class="home-search-mic">🎙️</span>
+            <div class="home-search-btn">↑</div>
+        </div>
+
+        <!-- 2x2 Feature Cards -->
+        <div class="features-grid">
+            <div class="feature-card" onclick="openChatWithPrompt('Hello Bee AI, let us talk about anything!')">
+                <div class="feature-icon-box">❓</div>
+                <div class="feature-text">
+                    <h4>Ask Anything</h4>
+                    <p>General knowledge</p>
+                </div>
+            </div>
+            <div class="feature-card" onclick="switchScreen('study-screen')">
+                <div class="feature-icon-box">🎓</div>
+                <div class="feature-text">
+                    <h4>Study Helper</h4>
+                    <p>Learn & understand</p>
+                </div>
+            </div>
+            <div class="feature-card" onclick="switchScreen('writing-screen')">
+                <div class="feature-icon-box">✏️</div>
+                <div class="feature-text">
+                    <h4>Writing Help</h4>
+                    <p>Write better</p>
+                </div>
+            </div>
+            <div class="feature-card" onclick="openChatWithPrompt('Give me some smart daily life tips and solutions!')">
+                <div class="feature-icon-box">☕</div>
+                <div class="feature-text">
+                    <h4>Daily Life</h4>
+                    <p>Tips & solutions</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Chats Section -->
+        <div class="recent-section-header">
+            <h3>Recent Chats</h3>
+            <span class="see-all-link" onclick="toggleSidebar()">See All</span>
+        </div>
+        <div class="recent-chat-list" id="home-recent-list">
+            <!-- Dynamically populated from your chat history -->
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SCREEN 2: AI WRITING ASSISTANT ==================== -->
+<div class="screen-view" id="writing-screen">
+    <div class="tool-screen-container">
+        <div class="tool-hero-card">
+            <div class="tool-hero-icon">🖋️</div>
+            <h2>AI Writing Assistant</h2>
+            <p>Bee AI Writing Assistant helps you create high-quality content for any purpose. From essays and emails to stories and social media posts.</p>
+        </div>
+
+        <div class="tool-list">
+            <div class="tool-list-item" onclick="openChatWithPrompt('Please check the grammar and spelling of the following text: ')">
+                <div class="tool-item-icon">✏️</div>
+                <div class="tool-item-text">
+                    <h4>Grammar & Spell Check</h4>
+                    <p>Error-free writing</p>
+                </div>
+            </div>
+            <div class="tool-list-item" onclick="openChatWithPrompt('Rewrite the following text to make it sound more professional and engaging: ')">
+                <div class="tool-item-icon">⚡</div>
+                <div class="tool-item-text">
+                    <h4>Tone & Style Suggestions</h4>
+                    <p>Match your writing tone</p>
+                </div>
+            </div>
+            <div class="tool-list-item" onclick="openChatWithPrompt('Please summarize the following text into clear, concise bullet points: ')">
+                <div class="tool-item-icon">📝</div>
+                <div class="tool-item-text">
+                    <h4>Summarize & Rewrite</h4>
+                    <p>Shorten or improve any text</p>
+                </div>
+            </div>
+            <div class="tool-list-item" onclick="openChatWithPrompt('Translate the following text accurately into Urdu and English: ')">
+                <div class="tool-item-icon">🌐</div>
+                <div class="tool-item-text">
+                    <h4>Multi-language Support</h4>
+                    <p>Write in multiple languages</p>
+                </div>
+            </div>
+        </div>
+
+        <button class="cta-bottom-btn" onclick="openChatWithPrompt('I need help writing something!')">
+            <span>Start Writing</span>
+            <span>→</span>
+        </button>
+    </div>
+</div>
+
+<!-- ==================== SCREEN 3: STUDY HELPER ==================== -->
+<div class="screen-view" id="study-screen">
+    <div class="tool-screen-container">
+        <div class="tool-hero-card">
+            <div class="tool-hero-icon">🎓</div>
+            <h2>Study Helper</h2>
+            <p>Your personal AI tutor that helps you understand any topic, solve problems, and study more efficiently.</p>
+        </div>
+
+        <div class="tool-list">
+            <div class="tool-list-item" onclick="openChatWithPrompt('Explain the following topic simply and clearly with practical examples: ')">
+                <div class="tool-item-icon">💡</div>
+                <div class="tool-item-text">
+                    <h4>Explain Any Topic</h4>
+                    <p>Get clear explanations</p>
+                </div>
+            </div>
+            <div class="tool-list-item" onclick="openChatWithPrompt('Solve this math/science problem step-by-step: ')">
+                <div class="tool-item-icon">🔢</div>
+                <div class="tool-item-text">
+                    <h4>Solve Problems</h4>
+                    <p>Math, Science & more</p>
+                </div>
+            </div>
+            <div class="tool-list-item" onclick="openChatWithPrompt('Generate a 3-question practice quiz with answers at the end for the following subject: ')">
+                <div class="tool-item-icon">📋</div>
+                <div class="tool-item-text">
+                    <h4>Quiz Generator</h4>
+                    <p>Test your knowledge</p>
+                </div>
+            </div>
+            <div class="tool-list-item" onclick="openChatWithPrompt('Create a structured 7-day study plan for the following subject/exam: ')">
+                <div class="tool-item-icon">📅</div>
+                <div class="tool-item-text">
+                    <h4>Study Plan Builder</h4>
+                    <p>Personalized study plan</p>
+                </div>
+            </div>
+        </div>
+
+        <button class="cta-bottom-btn" onclick="openChatWithPrompt('I need a study tutor to explain a concept!')">
+            <span>Start Learning</span>
+            <span>→</span>
+        </button>
+    </div>
+</div>
+
+<!-- ==================== SCREEN 4: LIVE AI CHAT ROOM ==================== -->
+<div class="screen-view" id="chat-screen">
+    <div id="chat">
+        <div class="suggestions-container" id="suggestions">
+            <div class="chip" onclick="sendQuickPrompt('🎨 Draw a cyberpunk bee in neon city')">🎨 Draw cyberpunk bee</div>
+            <div class="chip" onclick="fetchLocationWeather()">📍 Weather & Location</div>
+            <div class="chip" onclick="sendQuickPrompt('💡 Startup ideas')">💡 Startup ideas</div>
+        </div>
+    </div>  
+
+    <div class="input-wrapper">
+        <!-- ATTACHED PHOTO PREVIEW -->
+        <div id="preview-box">
+            <div class="preview-container">
+                <img id="image-preview" src="" alt="Selected photo preview">
+                <div class="preview-hint">Photo attached. Just tell me what to do — e.g. "remove the background" or "make it black and white" — and I'll send back the edited photo.</div>
+                <button class="clear-img" aria-label="Remove photo" onclick="clearImage()">Remove ✕</button>
+            </div>
+        </div>
+        
+        <div class="input-area">  
+            <input type="file" id="file-input" style="display:none" accept="image/*" onchange="processSelectedImage(event)">
+            
+            <!-- CAMERA / UPLOAD BUTTON -->
+            <button class="icon-btn-premium" title="Upload Photo" aria-label="Upload a photo" onclick="document.getElementById('file-input').click()">
+                <svg class="icon-btn-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/></svg>
+            </button>
+            
+            <!-- VOICE MIC BUTTON -->
+            <button class="icon-btn-premium" id="mic-btn" title="Voice Input" aria-label="Dictate your message with voice input" onclick="startVoiceRecognition()">
+                <svg class="icon-btn-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
+            </button>
+            
+            <div class="pill-input-container">
+                <label for="question" class="sr-only">Ask me anything</label>
+                <input type="text" id="question" placeholder="Ask me anything..." onkeydown="if(event.key==='Enter'){event.preventDefault();handleSend();}">  
+                <button class="send-btn" id="send-btn" onclick="handleSend()" title="Send Message" aria-label="Send message">
+                    <svg class="svg-send" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>  
+            </div>
+        </div>  
+    </div>
+</div>
+
+<!-- ==================== BOTTOM NAVIGATION BAR ==================== -->
+<div class="bottom-nav">
+    <div class="nav-tab active" id="tab-home" role="button" tabindex="0" aria-label="Home" onclick="switchScreen('home-screen')" onkeydown="if(event.key==='Enter')switchScreen('home-screen')">
+        <span class="nav-tab-icon" aria-hidden="true">🏠</span>
+        <span>Home</span>
+    </div>
+    <div class="nav-tab" id="tab-history" role="button" tabindex="0" aria-label="Chat history" onclick="toggleSidebar()" onkeydown="if(event.key==='Enter')toggleSidebar()">
+        <span class="nav-tab-icon" aria-hidden="true">📜</span>
+        <span>History</span>
+    </div>
+    <div class="center-hive-btn" role="button" tabindex="0" aria-label="Start a new chat" onclick="startNewChat()" onkeydown="if(event.key==='Enter')startNewChat()" title="New Chat">
+        <span aria-hidden="true">🐝</span>
+    </div>
+    <div class="nav-tab" id="tab-tools" role="button" tabindex="0" aria-label="Writing tools" onclick="switchScreen('writing-screen')" onkeydown="if(event.key==='Enter')switchScreen('writing-screen')">
+        <span class="nav-tab-icon" aria-hidden="true">🛠️</span>
+        <span>Tools</span>
+    </div>
+    <div class="nav-tab" id="tab-study" role="button" tabindex="0" aria-label="Study helper" onclick="switchScreen('study-screen')" onkeydown="if(event.key==='Enter')switchScreen('study-screen')">
+        <span class="nav-tab-icon" aria-hidden="true">📚</span>
+        <span>Study</span>
+    </div>
+</div>
+</div><!-- /#app-main -->
+
+<script>  
+    // ⚠️ Note: this key is hardcoded and visible to anyone who views the page source.
+    // Fine for quick testing, but for a real launch move this behind a backend so the
+    // key isn't public. Restored here at your request.
+    const API_KEY = "AQ.Ab8RN6KHTz6Yh5LwFKShHxfgNOveccStPZUugA9qyT8dYaJJ-A";
+    const TEXT_MODEL = "gemini-3.5-flash-lite"; // current low-cost, low-latency Gemini model
+    const IMAGE_MODEL = "gemini-2.5-flash-image"; // "Nano Banana" — Gemini's native image generation/editing model
+    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${API_KEY}`;
+    const GEMINI_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:generateContent?key=${API_KEY}`;
+
+    let base64Image = null;
+    let imageBackupSource = null; 
+    let activeEditedDataUrl = null;
+    let lastChatImage = null; // most recent image shown in the current chat — attached, generated, or edited — so "edit it" works without re-attaching
+
+    let chats = JSON.parse(localStorage.getItem('beeChats')) || [];
+    let activeChatId = localStorage.getItem('beeActiveId') || null;
+
+    window.onload = () => {
+        if (chats.length === 0) startNewChat();
+        else loadChat(activeChatId || chats[0].id);
+        renderSidebar();
+        renderHomeRecentChats();
+        applyUserName();
+        applyInputPlaceholder();
+
+        // Only show the starter screen the very first time the app is opened.
+        const onboardingScreen = document.getElementById('onboarding-screen');
+        if (localStorage.getItem('beeOnboarded') === 'true') {
+            onboardingScreen.style.display = 'none';
+        } else {
+            onboardingScreen.style.display = 'flex';
+            document.getElementById('ob-name').focus();
+        }
+    };
+
+    /* Shows "Ask me anything..." the very first time the app is opened; every
+       time after that, the input box hints at Honey feedback instead. */
+    function applyInputPlaceholder() {
+        const input = document.getElementById('question');
+        if (!input) return;
+        if (localStorage.getItem('beeVisitedBefore') === 'true') {
+            input.placeholder = 'What change should we make in Honey?';
+        } else {
+            input.placeholder = 'Ask me anything...';
+            localStorage.setItem('beeVisitedBefore', 'true');
+        }
+    }
+
+    /* ==================== STARTER / ONBOARDING FLOW ==================== */
+    let obData = { name: '', interest: '', lang: 'auto', awesomeName: '', color: '', food: '', country: '', city: '', permissions: {} };
+
+    function obNext(fromStep) {
+        if (fromStep === 1) {
+            obData.name = document.getElementById('ob-name').value.trim();
+        }
+        if (fromStep === 4) {
+            obData.awesomeName = document.getElementById('ob-awesome-name').value.trim();
+            obData.color = document.getElementById('ob-color').value.trim();
+            obData.food = document.getElementById('ob-food').value.trim();
+            obData.country = document.getElementById('ob-country').value.trim();
+            obData.city = document.getElementById('ob-city').value.trim();
+        }
+        document.getElementById('ob-step-' + fromStep).classList.remove('active');
+        document.getElementById('ob-step-' + (fromStep + 1)).classList.add('active');
+    }
+
+    /* Requests a browser permission (location / mic / camera) from the onboarding
+       permissions step and reflects the result (granted/denied) on the button + status text. */
+    function requestObPermission(type) {
+        const btn = document.getElementById('ob-perm-' + type + '-btn');
+        const status = document.getElementById('ob-perm-' + type + '-status');
+        if (!btn) return;
+        btn.textContent = '...';
+
+        function onGranted(label) {
+            obData.permissions[type] = 'granted';
+            btn.textContent = 'Allowed';
+            btn.classList.add('granted');
+            btn.classList.remove('denied');
+            btn.disabled = true;
+            if (status) status.textContent = label;
+        }
+        function onDenied(label) {
+            obData.permissions[type] = 'denied';
+            btn.textContent = 'Retry';
+            btn.classList.add('denied');
+            btn.classList.remove('granted');
+            if (status) status.textContent = label;
+        }
+
+        if (type === 'location') {
+            if (!navigator.geolocation) { onDenied('Not supported on this device'); return; }
+            navigator.geolocation.getCurrentPosition(
+                () => onGranted('Location access granted'),
+                () => onDenied('Permission denied — tap to retry')
+            );
+        } else if (type === 'mic' || type === 'camera') {
+            const constraints = type === 'mic' ? { audio: true } : { video: true };
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                onDenied('Not supported on this device'); return;
+            }
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(stream => {
+                    // Stop tracks immediately — we only needed the permission prompt, not an open stream.
+                    stream.getTracks().forEach(t => t.stop());
+                    onGranted(type === 'mic' ? 'Microphone access granted' : 'Camera access granted');
+                })
+                .catch(() => onDenied('Permission denied — tap to retry'));
+        }
+    }
+
+    function obSelect(btn, field, value) {
+        btn.parentElement.querySelectorAll('.ob-choice').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        obData[field] = value;
+    }
+
+    function finishOnboarding() {
+        const name = obData.name || 'there';
+        localStorage.setItem('beeUserName', name);
+        localStorage.setItem('beeUserInterest', obData.interest || '');
+        localStorage.setItem('beeUserLang', obData.lang || 'auto');
+        localStorage.setItem('beeUserAwesomeName', obData.awesomeName || '');
+        localStorage.setItem('beeUserColor', obData.color || '');
+        localStorage.setItem('beeUserFood', obData.food || '');
+        localStorage.setItem('beeUserCountry', obData.country || '');
+        localStorage.setItem('beeUserCity', obData.city || '');
+        localStorage.setItem('beeUserPermissions', JSON.stringify(obData.permissions || {}));
+        localStorage.setItem('beeOnboarded', 'true');
+        document.getElementById('onboarding-screen').style.display = 'none';
+        applyUserName();
+
+        // Jump straight into the tool the user said they were most interested in.
+        if (obData.interest === 'writing') switchScreen('writing-screen');
+        else if (obData.interest === 'study') switchScreen('study-screen');
+        else if (obData.interest === 'images') openChatWithPrompt('Draw me something amazing!');
+    }
+
+    function applyUserName() {
+        const name = localStorage.getItem('beeUserName');
+        const greetEl = document.getElementById('greeting-name');
+        const subEl = document.getElementById('greeting-sub');
+        if (greetEl) greetEl.textContent = name ? `Hello, ${name} 👋` : `Hello there 👋`;
+        if (subEl) subEl.textContent = name ? `How can I help you today, ${name}?` : `How can I help you today?`;
+    }
+
+    // Resets the app back to a brand-new-user state: the starter/onboarding screen
+    // reappears (as if opened for the very first time), used after the user clears
+    // all of their chat history.
+    function resetToOnboarding() {
+        localStorage.removeItem('beeOnboarded');
+        obData = { name: '', interest: '', lang: 'auto', awesomeName: '', color: '', food: '', country: '', city: '', permissions: {} };
+
+        document.querySelectorAll('.onboarding-step').forEach(step => step.classList.remove('active'));
+        document.getElementById('ob-step-1').classList.add('active');
+        document.querySelectorAll('.ob-choice').forEach(b => b.classList.remove('selected'));
+        ['ob-name', 'ob-awesome-name', 'ob-color', 'ob-food', 'ob-country', 'ob-city'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        document.querySelectorAll('.ob-permission-btn').forEach(btn => {
+            btn.textContent = 'Allow';
+            btn.classList.remove('granted', 'denied');
+            btn.disabled = false;
+        });
+
+        const onboardingScreen = document.getElementById('onboarding-screen');
+        onboardingScreen.style.display = 'flex';
+        document.getElementById('ob-name').focus();
+    }
+
+    /* ==================== MULTI-SCREEN SWITCHER ==================== */
+    function switchScreen(screenId) {
+        document.querySelectorAll('.screen-view').forEach(screen => {
+            screen.classList.remove('active');
+        });
+        document.getElementById(screenId).classList.add('active');
+
+        // Update Bottom Nav Active Styling (mobile/tablet)
+        document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+        if (screenId === 'home-screen') document.getElementById('tab-home').classList.add('active');
+        else if (screenId === 'writing-screen') document.getElementById('tab-tools').classList.add('active');
+        else if (screenId === 'study-screen') document.getElementById('tab-study').classList.add('active');
+
+        // Update Sidebar Nav Active Styling (desktop)
+        document.querySelectorAll('.sidebar-nav-item').forEach(tab => tab.classList.remove('active'));
+        if (screenId === 'home-screen') document.getElementById('side-tab-home')?.classList.add('active');
+        else if (screenId === 'writing-screen') document.getElementById('side-tab-tools')?.classList.add('active');
+        else if (screenId === 'study-screen') document.getElementById('side-tab-study')?.classList.add('active');
+
+        // Update Nav Title
+        const navTitle = document.getElementById('nav-title');
+        if (screenId === 'home-screen') navTitle.innerText = "Bee AI";
+        else if (screenId === 'writing-screen') navTitle.innerText = "AI Writing Assistant";
+        else if (screenId === 'study-screen') navTitle.innerText = "Study Helper";
+        else if (screenId === 'chat-screen') navTitle.innerText = "Bee AI Chat";
+    }
+
+    function openChatWithPrompt(promptText) {
+        switchScreen('chat-screen');
+        const input = document.getElementById('question');
+        if (promptText) {
+            input.value = promptText;
+            input.focus();
+        }
+    }
+
+    function toggleGreeting() {
+        const greeting = document.getElementById('user-greeting');
+        const searchBar = document.getElementById('home-search-bar');
+        const toggleBtn = document.getElementById('mascot-toggle');
+        const isHidden = greeting.style.display === 'none';
+
+        greeting.style.display = isHidden ? 'block' : 'none';
+        searchBar.style.display = isHidden ? 'flex' : 'none';
+        toggleBtn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+    }
+
+    /* ==================== CHAT HISTORY & PERSISTENCE ==================== */
+    function toggleSidebar() { 
+        document.getElementById('sidebar').classList.toggle('open'); 
+        document.getElementById('drawerOverlay').classList.toggle('show');
+    }
+    
+    function scrollChat() { 
+        const chat = document.getElementById('chat'); 
+        chat.scrollTop = chat.scrollHeight; 
+    }
+
+    function sendQuickPrompt(promptText) {
+        document.getElementById('question').value = promptText;
+        handleSend();
+    }
+
+    // Escapes HTML special characters so user input and API responses are always
+    // rendered as plain text, never interpreted as markup. This closes an XSS hole
+    // where a message like "<img src=x onerror=...>" would previously execute.
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function formatMarkdown(text) {
+        if (!text) return "";
+        // Escape first, then apply markdown formatting on top of the safe, escaped text.
+        let formatted = escapeHtml(text)
+            .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/\n/g, '<br>');
+        return formatted;
+    }
+
+    function startNewChat() {
+        activeChatId = Date.now().toString();
+        chats.unshift({ id: activeChatId, title: "New Chat 🐝", messages: [] });
+        saveData();
+        renderSidebar();
+        renderHomeRecentChats();
+        loadChat(activeChatId);
+        if(document.getElementById('sidebar').classList.contains('open')) toggleSidebar();
+        switchScreen('chat-screen');
+    }
+
+    function deleteChat(id, event) {
+        event.stopPropagation();
+        chats = chats.filter(c => c.id !== id);
+        if (chats.length === 0) {
+            localStorage.removeItem('beeChats');
+            localStorage.removeItem('beeActiveId');
+            startNewChat();
+            resetToOnboarding(); // all chat history is gone — treat this like a fresh install
+        } else {
+            if (activeChatId === id) activeChatId = chats[0].id;
+            saveData();
+            renderSidebar();
+            renderHomeRecentChats();
+            loadChat(activeChatId);
+        }
+    }
+
+    function clearAllChats() {
+        if (confirm("Delete all chat history?")) {
+            chats = [];
+            localStorage.removeItem('beeChats');
+            localStorage.removeItem('beeActiveId');
+            startNewChat();
+            resetToOnboarding(); // all chat history is gone — treat this like a fresh install
+        }
+    }
+
+    function loadChat(id) {
+        activeChatId = id;
+        localStorage.setItem('beeActiveId', id);
+        const chatBox = document.getElementById('chat');
+        let currentChat = chats.find(c => c.id === id);
+        if (!currentChat) return;
+
+        const suggestionsHTML = `
+            <div class="suggestions-container" id="suggestions">
+                <div class="chip" onclick="sendQuickPrompt('🎨 Draw a cyberpunk bee in neon city')">🎨 Draw cyberpunk bee</div>
+                <div class="chip" onclick="fetchLocationWeather()">📍 Weather & Location</div>
+                <div class="chip" onclick="sendQuickPrompt('💡 Startup ideas')">💡 Startup ideas</div>
+            </div>`;
+
+        if (currentChat.messages.length === 0) {
+            const userName = localStorage.getItem('beeUserName');
+            const greetingText = userName ? `Hello, ${userName}! I am Bee AI. How can I help you today? 🐝✨` : `Hello! I am Bee AI. How can I help you today? 🐝✨`;
+            chatBox.innerHTML = suggestionsHTML + `
+                <div class="msg-row bot-row">
+                    <div class="avatar bot-avatar">🐝</div>
+                    <div class="msg bot">${escapeHtml(greetingText)}</div>
+                </div>`;
+        } else {
+            chatBox.innerHTML = '';
+            currentChat.messages.forEach(msg => {
+                const isUser = msg.role === 'User';
+                const row = document.createElement('div');
+                row.className = `msg-row ${isUser ? 'user-row' : 'bot-row'}`;
+                const avatar = `<div class="avatar ${isUser ? 'user-avatar' : 'bot-avatar'}">${isUser ? '👤' : '🐝'}</div>`;
+                
+                let contentHTML = "";
+                if (msg.isImage) {
+                    const label = (msg.imageMeta && msg.imageMeta.label) || 'Generated Image';
+                    const dlFilename = (msg.imageMeta && msg.imageMeta.filename) || 'BeeAI_Artwork.jpg';
+                    contentHTML = `
+                        <div class="msg bot">
+                            🐝 <b>${label}:</b><br>
+                            <img class="rendered-img" src="${msg.text}" alt="${escapeHtml(label)}"><br>
+                            <button class="download-btn-overlay" onclick="downloadImageFromUrl('${msg.text}', '${dlFilename}')">💾 Save Image</button>
+                        </div>`;
+                } else if (msg.attachedImage) {
+                    contentHTML = `
+                        <div class="msg ${isUser ? 'user' : 'bot'}">
+                            ${msg.text ? formatMarkdown(msg.text) + '<br>' : ''}
+                            <img class="rendered-img" src="${msg.attachedImage}" alt="Attached photo">
+                        </div>`;
+                } else {
+                    const downloadActions = !isUser ? buildDownloadActions(msg.text) : '';
+                    contentHTML = `<div class="msg ${isUser ? 'user' : 'bot'}">${formatMarkdown(msg.text)}${downloadActions}</div>`;
+                }
+
+                row.innerHTML = isUser ? (contentHTML + avatar) : (avatar + contentHTML);
+                chatBox.appendChild(row);
+            });
+        }
+        renderSidebar();
+        renderHomeRecentChats();
+        scrollChat();
+
+        // Restore "last image in this chat" so a follow-up edit request works
+        // even after switching chats or reloading the page.
+        lastChatImage = null;
+        for (let i = currentChat.messages.length - 1; i >= 0; i--) {
+            const m = currentChat.messages[i];
+            if (m.isImage && m.text) { lastChatImage = m.text; break; }
+            if (m.attachedImage) { lastChatImage = m.attachedImage; break; }
+        }
+    }
+
+    function renderSidebar() {
+        const list = document.getElementById('chat-list');
+        list.innerHTML = '';
+        chats.forEach(chat => {
+            const isActive = chat.id === activeChatId ? 'active' : '';
+            list.innerHTML += `
+                <div class="chat-item-wrapper ${isActive}" role="listitem">
+                    <span class="chat-title-text" onclick="loadChat('${chat.id}'); toggleSidebar(); switchScreen('chat-screen');">💬 ${escapeHtml(chat.title)}</span>
+                    <button class="delete-chat-btn" aria-label="Delete chat: ${escapeHtml(chat.title)}" onclick="deleteChat('${chat.id}', event)">🗑️</button>
+                </div>`;
+        });
+    }
+
+    function renderHomeRecentChats() {
+        const homeList = document.getElementById('home-recent-list');
+        if (!homeList) return;
+        homeList.innerHTML = '';
+        
+        const recentSubset = chats.slice(0, 3);
+        if (recentSubset.length === 0) {
+            homeList.innerHTML = `<div style="color: var(--text-secondary); font-size: 0.85rem; text-align: center; padding: 12px;">No recent chats yet. Ask a question to begin!</div>`;
+            return;
+        }
+
+        recentSubset.forEach(chat => {
+            homeList.innerHTML += `
+                <div class="recent-chat-item" onclick="loadChat('${chat.id}'); switchScreen('chat-screen');">
+                    <div class="recent-chat-info">
+                        <span>💬 ${escapeHtml(chat.title)}</span>
+                    </div>
+                    <span class="recent-chat-time">Recent</span>
+                </div>`;
+        });
+    }
+
+    function saveMessage(role, text, isImage = false, attachedImage = null, imageMeta = null) {
+        let currentChat = chats.find(c => c.id === activeChatId);
+        if (!currentChat) return;
+        currentChat.messages.push({ role, text, isImage, attachedImage, imageMeta });
+        if (currentChat.messages.length === 1 && role === 'User') {
+            currentChat.title = (text || "Photo Attachment").substring(0, 24);
+        }
+        saveData();
+        renderSidebar();
+        renderHomeRecentChats();
+    }
+
+    function saveData() {
+        try {
+            localStorage.setItem('beeChats', JSON.stringify(chats));
+        } catch (e) {
+            // Most likely QuotaExceededError — localStorage caps out around 5-10MB per origin,
+            // and full-resolution base64 photos fill that up fast. Drop the oldest chat and retry
+            // once rather than silently losing the newest message.
+            console.warn('Storage quota exceeded, trimming oldest chat.', e);
+            if (chats.length > 1) {
+                chats.pop();
+                try { localStorage.setItem('beeChats', JSON.stringify(chats)); }
+                catch (e2) { console.error('Still over quota after trimming.', e2); }
+            }
+        }
+    }
+
+    /* ==================== PHOTO ATTACHMENT (no manual editor — edits happen via chat) ==================== */
+    function processSelectedImage(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            imageBackupSource = e.target.result;
+            activeEditedDataUrl = e.target.result;
+            base64Image = e.target.result.split(',')[1];
+            document.getElementById('image-preview').src = e.target.result;
+            document.getElementById('preview-box').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    /* ==================== CHAT-DRIVEN IMAGE EDITING — POWERED ENTIRELY BY GEMINI ====================
+       No local filters, no third-party libraries — every edit request (background
+       removal, style changes, adding/removing objects, anything) is sent straight to
+       Gemini's native image model ("Nano Banana"), which understands the instruction
+       in plain English and returns the edited image directly. */
+
+    // Broad catch-all for "this is an edit request" — Gemini itself interprets what
+    // the edit actually is, so this just needs to recognize the intent.
+    function isImageEditRequest(text) {
+        if (!text) return false;
+        const t = text.toLowerCase();
+        return /\b(edit|remove|add|change|replace|make it|turn (it|this|the) into|colou?rize|brighten|darken|background|enhance|retouch|transform|convert|blur|sharpen|crop|resize|rotate|flip|filter|restyle|recolor|recolour|touch up|redraw|repaint)\b/.test(t);
+    }
+
+    function blobToDataUrl(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    // Chat-attached photos are already data: URLs, but Bee AI's own generated
+    // images might not be — normalize to a data URL so we can always extract
+    // clean base64 + mime type for the Gemini request.
+    async function ensureDataUrl(imageUrl) {
+        if (imageUrl.startsWith('data:')) return imageUrl;
+        try {
+            const res = await fetch(imageUrl);
+            const blob = await res.blob();
+            return await blobToDataUrl(blob);
+        } catch (e) {
+            throw new Error("that image can't be loaded right now");
+        }
+    }
+
+    // Core call into Gemini's image model. With no reference image this generates
+    // a brand-new image from the prompt; with a reference image it edits that image
+    // according to the prompt (background removal, style changes, adding/removing
+    // things, colorizing, etc. — anything expressible in plain English).
+    async function generateImageWithGemini(promptText, referenceImageUrl = null) {
+        if (!API_KEY) throw new Error("No Gemini API key is configured.");
+
+        const parts = [{ text: promptText }];
+        if (referenceImageUrl) {
+            const dataUrl = await ensureDataUrl(referenceImageUrl);
+            const match = dataUrl.match(/^data:([^;]+);base64,(.*)$/s);
+            if (!match) throw new Error("Couldn't read that image.");
+            parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+        }
+
+        const payload = {
+            contents: [{ role: 'user', parts }],
+            generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+        };
+
+        const response = await fetch(GEMINI_IMAGE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+
+        if (data.error) throw new Error(data.error.message || 'Image request failed.');
+        const responseParts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+        const imagePart = responseParts.find(p => p.inlineData && p.inlineData.data);
+        if (!imagePart) {
+            const textPart = responseParts.find(p => p.text);
+            throw new Error(textPart ? textPart.text : "Gemini didn't return an image.");
+        }
+        const resultDataUrl = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+        const textPart = responseParts.find(p => p.text);
+        return { imageDataUrl: resultDataUrl, caption: textPart ? textPart.text : '' };
+    }
+
+    // Handles an edit request against an image already in the conversation (freshly
+    // attached, or the last image Bee AI showed — including its own generated art),
+    // shows the animated thinking indicator, then posts the edited photo back into chat.
+    async function handleImageEditChat(userText, sourceImageUrl) {
+        const chatBox = document.getElementById('chat');
+        startThinkingIndicator(chatBox, userText || 'edit image');
+        try {
+            const result = await generateImageWithGemini(userText || 'Edit this image.', sourceImageUrl);
+            stopThinkingIndicator();
+
+            const replyRow = document.createElement('div');
+            replyRow.className = 'msg-row bot-row';
+            replyRow.innerHTML = `
+                <div class="avatar bot-avatar">🐝</div>
+                <div class="msg bot">
+                    🐝 <b>Edited Image:</b><br>
+                    <img class="rendered-img" src="${result.imageDataUrl}" alt="Edited photo"><br>
+                    <button class="download-btn-overlay" onclick="downloadImageFromUrl('${result.imageDataUrl}', 'BeeAI_Edited.png')">💾 Save Image</button>
+                </div>
+            `;
+            chatBox.appendChild(replyRow);
+            saveMessage('Bot', result.imageDataUrl, true, null, { label: 'Edited Image', filename: 'BeeAI_Edited.png' });
+            scrollChat();
+            lastChatImage = result.imageDataUrl; // so a follow-up edit chains off this result
+        } catch (e) {
+            stopThinkingIndicator();
+            const errRow = document.createElement('div');
+            errRow.className = 'msg-row bot-row';
+            errRow.innerHTML = `
+                <div class="avatar bot-avatar">🐝</div>
+                <div class="msg bot" style="border-color:#FF453A; color:#FF453A;">⚠️ Couldn't edit that image: ${escapeHtml(e.message)}</div>
+            `;
+            chatBox.appendChild(errRow);
+            scrollChat();
+        }
+    }
+
+    async function downloadImageFromUrl(url, filename = 'BeeAI_Image.jpg') {
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+        } catch (e) {
+            window.open(url, '_blank');
+        }
+    }
+    
+    /* ==================== DOWNLOAD AI RESPONSES AS FILES ==================== */
+    // Wraps plain text in a minimal Word-compatible HTML shell. Saving it with a .doc
+    // extension and the application/msword MIME type lets it open directly in Microsoft
+    // Word, Google Docs, or WPS Office without needing any external library.
+    function downloadAsWordDoc(text, filename = 'BeeAI_Document.doc') {
+        const bodyHtml = escapeHtml(text).replace(/\n/g, '<br>');
+        const htmlContent = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><title>Bee AI Document</title></head>
+<body style="font-family:Calibri, Arial, sans-serif; font-size:14px; line-height:1.6; color:#111;">${bodyHtml}</body>
+</html>`;
+        const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+        triggerBlobDownload(blob, filename);
+    }
+
+    function downloadAsTextFile(text, filename = 'BeeAI_Notes.txt') {
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        triggerBlobDownload(blob, filename);
+    }
+
+    // Renders the reply into a real, multi-page PDF using jsPDF (loaded from CDN).
+    // Falls back to a plain-text download if the library hasn't finished loading yet,
+    // so the button always produces a file instead of silently failing.
+    function downloadAsPDF(text, filename = 'BeeAI_Document.pdf') {
+        const jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+        if (!jsPDFCtor) {
+            downloadAsTextFile(text, filename.replace(/\.pdf$/i, '.txt'));
+            return;
+        }
+        const doc = new jsPDFCtor({ unit: 'pt', format: 'a4' });
+        const marginX = 48, marginY = 56;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const usableWidth = pageWidth - marginX * 2;
+
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(11);
+        const lines = doc.splitTextToSize(text, usableWidth);
+        const lineHeight = 15;
+        let cursorY = marginY;
+
+        lines.forEach(line => {
+            if (cursorY > pageHeight - marginY) {
+                doc.addPage();
+                cursorY = marginY;
+            }
+            doc.text(line, marginX, cursorY);
+            cursorY += lineHeight;
+        });
+
+        doc.save(filename);
+    }
+
+    function triggerBlobDownload(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // Builds the small "Save as PDF / Word / Text" action bar shown under longer
+    // AI replies. Text is percent-encoded into a data attribute (rather than inlined
+    // into the onclick string) so quotes, newlines, and special characters in the
+    // reply can never break the HTML or be misinterpreted.
+    function buildDownloadActions(text) {
+        if (!text || text.trim().length < 40) return ''; // skip tiny replies, not worth downloading
+        const encoded = encodeURIComponent(text);
+        return `
+            <div class="msg-download-actions">
+                <button class="download-btn-overlay" data-msg="${encoded}" onclick="downloadAsPDF(decodeURIComponent(this.dataset.msg), 'BeeAI_Document.pdf')">📕 Save as PDF</button>
+                <button class="download-btn-overlay" data-msg="${encoded}" onclick="downloadAsWordDoc(decodeURIComponent(this.dataset.msg), 'BeeAI_Document.doc')">📄 Save as Word</button>
+                <button class="download-btn-overlay" data-msg="${encoded}" onclick="downloadAsTextFile(decodeURIComponent(this.dataset.msg), 'BeeAI_Notes.txt')">📝 Save as Text</button>
+            </div>`;
+    }
+
+    function clearImage() { 
+        base64Image = null; 
+        imageBackupSource = null;
+        activeEditedDataUrl = null;
+        document.getElementById('file-input').value = "";
+        document.getElementById('preview-box').style.display = 'none'; 
+    }
+
+    function startVoiceRecognition() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) { alert("Voice recognition is not supported on this browser."); return; }
+        const recognition = new SpeechRecognition();
+        recognition.lang = navigator.language || 'en-US';
+        recognition.interimResults = false;
+        const micBtn = document.getElementById('mic-btn');
+        recognition.onstart = () => micBtn.classList.add('recording');
+        recognition.onend = () => micBtn.classList.remove('recording');
+        recognition.onerror = (e) => {
+            micBtn.classList.remove('recording');
+            if (e.error !== 'no-speech' && e.error !== 'aborted') {
+                console.warn('Speech recognition error:', e.error);
+            }
+        };
+        recognition.onresult = (e) => { document.getElementById('question').value = e.results[0][0].transcript; };
+        try { recognition.start(); } catch (e) { micBtn.classList.remove('recording'); }
+    }
+
+    /* ==================== GPS LOCATION & WEATHER ENGINE ==================== */
+    async function fetchLocationWeather() {
+        const chatBox = document.getElementById('chat');
+        const thinkingRow = document.createElement('div');
+        thinkingRow.className = 'msg-row bot-row';
+        thinkingRow.id = 'thinking';
+        thinkingRow.innerHTML = `
+            <div class="avatar bot-avatar">🐝</div>
+            <div class="msg bot" style="opacity:0.7;">📍 Requesting GPS Location & Weather...</div>
+        `;
+        chatBox.appendChild(thinkingRow);
+        scrollChat();
+
+        if (!navigator.geolocation) {
+            document.getElementById('thinking')?.remove();
+            alert("Geolocation is not supported by your browser.");
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            
+            try {
+                const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+                const wData = await wRes.json();
+                const lRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                const lData = await lRes.json();
+                
+                document.getElementById('thinking')?.remove();
+
+                const addr = lData.address || {};
+                const city = addr.city || addr.town || addr.village || addr.suburb || addr.state || "Your Location";
+                const country = addr.country || "";
+                const temp = wData.current_weather ? wData.current_weather.temperature : "N/A";
+                const wind = wData.current_weather ? wData.current_weather.windspeed : "N/A";
+
+                const weatherReport = `📍 **Location Info** 📍\n🏙️ **Area**: ${city}, ${country}\n🌐 **Coordinates**: ${lat.toFixed(2)}°, ${lon.toFixed(2)}°\n☀️ **Temperature**: ${temp}°C\n💨 **Wind Speed**: ${wind} km/h`;
+
+                const replyRow = document.createElement('div');
+                replyRow.className = 'msg-row bot-row';
+                replyRow.innerHTML = `
+                    <div class="avatar bot-avatar">🐝</div>
+                    <div class="msg bot">${formatMarkdown(weatherReport)}</div>
+                `;
+                chatBox.appendChild(replyRow);
+                saveMessage('Bot', weatherReport);
+                scrollChat();
+
+            } catch (e) {
+                document.getElementById('thinking')?.remove();
+                askGemini(`Tell me weather information for latitude ${lat} and longitude ${lon}`);
+            }
+        }, (err) => {
+            document.getElementById('thinking')?.remove();
+            alert("Please enable GPS location permissions to fetch your live weather!");
+        });
+    }
+
+    function isImagePrompt(text) {
+        const keywords = ['draw', 'generate image', 'create image', 'picture of', 'paint', 'generate picture', 'make image', 'illustration of', 'make an image', 'render image'];
+        const lower = text.toLowerCase();
+        return keywords.some(kw => lower.includes(kw));
+    }
+
+    let isSending = false;
+    let thinkingStepTimer = null;
+
+    /* ==================== ANIMATED "WHAT I'M DOING" THINKING INDICATOR ====================
+       Instead of a static "Processing..." label, cycle through a short list of
+       contextual status lines (picked from keywords in the user's message) while
+       waiting on the API — similar to how ChatGPT narrates its steps. */
+    function buildThinkingSteps(text) {
+        const t = (text || '').toLowerCase();
+        const steps = ['🧠 Understanding your request...'];
+        const addIf = (regex, step) => { if (regex.test(t) && !steps.includes(step)) steps.push(step); };
+
+        addIf(/\b(edit|update|modify|change|fix|revise)\b/, '📝 Editing file...');
+        addIf(/\b(secure|security|protect|encrypt|password|privacy)\b/, '🔒 Making security better...');
+        addIf(/\b(connect|api|integrate|link|sync|database)\b/, '🔗 Connecting...');
+        addIf(/\b(design|premium|ui|style|beautify|theme|polish|animation)\b/, '✨ Adding premium feel...');
+        addIf(/\b(write|essay|article|story|paragraph|blog|letter)\b/, '✍️ Drafting your text...');
+        addIf(/\b(code|program|script|function|bug|debug|develop|app)\b/, '💻 Writing code...');
+        addIf(/\btranslate\b/, '🌐 Translating...');
+        addIf(/\b(analy[sz]e|image|photo|picture)\b/, '🔍 Analyzing details...');
+        addIf(/\b(draw|paint|generate image|create image|illustration|render image)\b/, '🎨 Generating image...');
+        addIf(/\b(plan|organi[sz]e|schedule|steps)\b/, '🗂️ Organizing steps...');
+        addIf(/\b(research|find out|look up|search|explain)\b/, '🔎 Researching...');
+        addIf(/\b(background|bg)\b/, '🧼 Removing background...');
+
+        if (steps.length === 1) steps.push('🔎 Gathering information...');
+        steps.push('✅ Preparing your answer...');
+        return steps;
+    }
+
+    function startThinkingIndicator(chatBox, userText) {
+        const thinkingRow = document.createElement('div');
+        thinkingRow.className = 'msg-row bot-row';
+        thinkingRow.id = 'thinking';
+        thinkingRow.innerHTML = `
+            <div class="avatar bot-avatar">🐝</div>
+            <div class="msg bot" id="thinking-text" style="opacity:0.85;">🧠 Understanding your request...</div>
+        `;
+        chatBox.appendChild(thinkingRow);
+        scrollChat();
+
+        const steps = buildThinkingSteps(userText);
+        let stepIndex = 1; // step 0 already shown above
+        if (thinkingStepTimer) clearInterval(thinkingStepTimer);
+        thinkingStepTimer = setInterval(() => {
+            const el = document.getElementById('thinking-text');
+            if (!el) { clearInterval(thinkingStepTimer); thinkingStepTimer = null; return; }
+            el.textContent = steps[stepIndex % steps.length];
+            stepIndex++;
+        }, 1100);
+    }
+
+    function stopThinkingIndicator() {
+        if (thinkingStepTimer) { clearInterval(thinkingStepTimer); thinkingStepTimer = null; }
+        document.getElementById('thinking')?.remove();
+    }
+
+    /* ==================== PROFILE RECALL (instant, no API call) ====================
+       Answers simple questions about what the user told Bee AI during onboarding
+       (awesome name, favourite colour, country, favourite city) straight from
+       localStorage — fast, and works even without an API key configured. */
+    function tryProfileAnswer(text) {
+        if (!text) return null;
+        const t = text.toLowerCase();
+        const facts = {
+            name: localStorage.getItem('beeUserName'),
+            awesomeName: localStorage.getItem('beeUserAwesomeName'),
+            color: localStorage.getItem('beeUserColor'),
+            food: localStorage.getItem('beeUserFood'),
+            country: localStorage.getItem('beeUserCountry'),
+            city: localStorage.getItem('beeUserCity')
+        };
+
+        const looksLikeQuestion = /\?|what|which|who|do you know|remember|tell me/.test(t);
+        if (!looksLikeQuestion) return null;
+
+        if (/(everything|all)\b.*\b(know|remember)\b.*\b(about me|me)\b/.test(t) || /what.*know about me/.test(t)) {
+            const parts = [];
+            if (facts.name) parts.push(`- Name: **${facts.name}**`);
+            if (facts.awesomeName) parts.push(`- Awesome name: **${facts.awesomeName}**`);
+            if (facts.color) parts.push(`- Favourite colour: **${facts.color}**`);
+            if (facts.food) parts.push(`- Favourite food: **${facts.food}**`);
+            if (facts.country) parts.push(`- Country: **${facts.country}**`);
+            if (facts.city) parts.push(`- Favourite city & country: **${facts.city}**`);
+            if (parts.length) return `Here's what I remember about you 🐝:\n${parts.join('\n')}`;
+            return null;
+        }
+        if (/awesome name/.test(t) && facts.awesomeName) {
+            return `Your awesome name is **${facts.awesomeName}** 🐝✨`;
+        }
+        if (/(favou?rite|fav)\s*colou?r/.test(t) && facts.color) {
+            return `Your favourite colour is **${facts.color}** 🎨`;
+        }
+        if (/(favou?rite|fav)\s*food/.test(t) && facts.food) {
+            return `Your favourite food is **${facts.food}** 🍽️`;
+        }
+        if (/(favou?rite|fav)\s*city/.test(t) && facts.city) {
+            return `Your favourite city & country to visit is **${facts.city}** ✈️`;
+        }
+        if (/(which|what)\s*country/.test(t) && facts.country) {
+            return `You're from **${facts.country}** 🌍`;
+        }
+        if (/(what.*my name|who am i|call me)/.test(t) && facts.name) {
+            return `I call you **${facts.name}** 👋`;
+        }
+        return null;
+    }
+
+    function handleSend() {
+        if (isSending) return; // ignore rapid double-taps / double Enter while a reply is in flight
+
+        const input = document.getElementById('question');
+        const text = input.value.trim();
+        const attachedPic = activeEditedDataUrl;
+
+        if (!text && !attachedPic) return;
+
+        const chatBox = document.getElementById('chat');
+        const userRow = document.createElement('div');
+        userRow.className = 'msg-row user-row';
+        
+        let userHTML = attachedPic 
+            ? `<div class="msg user">${text ? formatMarkdown(text) + '<br>' : ''}<img class="rendered-img" src="${attachedPic}" alt="Attached photo"></div>`
+            : `<div class="msg user">${formatMarkdown(text)}</div>`;
+
+        userRow.innerHTML = userHTML + `<div class="avatar user-avatar">YOU</div>`;
+        chatBox.appendChild(userRow);
+
+        saveMessage('User', text, false, attachedPic);
+        input.value = "";
+        scrollChat();
+
+        isSending = true;
+        const sendBtn = document.getElementById('send-btn');
+        if (sendBtn) sendBtn.disabled = true;
+
+        const finishSending = () => {
+            isSending = false;
+            if (sendBtn) sendBtn.disabled = false;
+        };
+
+        if (attachedPic) lastChatImage = attachedPic; // remember what was just shared, for later edit requests
+
+        // Figure out if this message is an edit instruction, and which image it
+        // should apply to — a freshly attached photo, or the last image already
+        // in this chat (including one Bee AI generated or edited itself). Gemini
+        // itself interprets what the edit actually means, so no local keyword
+        // mapping is needed beyond recognizing edit intent.
+        const editSourceImage = attachedPic || lastChatImage;
+        const wantsEdit = editSourceImage && isImageEditRequest(text);
+
+        if (wantsEdit) {
+            handleImageEditChat(text, editSourceImage).finally(finishSending);
+            if (attachedPic) clearImage();
+        } else if (isImagePrompt(text) && !base64Image) {
+            generateAIImage(text).finally(finishSending);
+            clearImage();
+        } else {
+            const profileAnswer = tryProfileAnswer(text);
+            if (profileAnswer && !attachedPic) {
+                const replyRow = document.createElement('div');
+                replyRow.className = 'msg-row bot-row';
+                replyRow.innerHTML = `
+                    <div class="avatar bot-avatar">🐝</div>
+                    <div class="msg bot">${formatMarkdown(profileAnswer)}</div>
+                `;
+                chatBox.appendChild(replyRow);
+                saveMessage('Bot', profileAnswer);
+                scrollChat();
+                finishSending();
+            } else {
+                askGemini(text).finally(finishSending);
+            }
+        }
+    }
+
+    /* ==================== AI IMAGE GENERATION ENGINE (Gemini "Nano Banana") ==================== */
+    async function generateAIImage(promptText) {
+        const chatBox = document.getElementById('chat');
+        startThinkingIndicator(chatBox, promptText);
+
+        try {
+            const result = await generateImageWithGemini(promptText);
+            stopThinkingIndicator();
+
+            const replyRow = document.createElement('div');
+            replyRow.className = 'msg-row bot-row';
+            replyRow.innerHTML = `
+                <div class="avatar bot-avatar">🐝</div>
+                <div class="msg bot">
+                    🐝 <b>Artwork Rendered:</b><br>
+                    <img class="rendered-img" src="${result.imageDataUrl}" alt="AI-generated artwork for: ${escapeHtml(promptText)}"><br>
+                    <button class="download-btn-overlay" onclick="downloadImageFromUrl('${result.imageDataUrl}', 'BeeAI_Artwork.png')">💾 Save Image</button>
+                </div>
+            `;
+            chatBox.appendChild(replyRow);
+            saveMessage('Bot', result.imageDataUrl, true, null, { label: 'Artwork Rendered', filename: 'BeeAI_Artwork.png' });
+            scrollChat();
+            lastChatImage = result.imageDataUrl; // so the user can say "edit it" right after generating
+        } catch (e) {
+            stopThinkingIndicator();
+            const errRow = document.createElement('div');
+            errRow.className = 'msg-row bot-row';
+            errRow.innerHTML = `
+                <div class="avatar bot-avatar">🐝</div>
+                <div class="msg bot" style="color:#FF453A;">⚠️ Couldn't generate that image: ${escapeHtml(e.message)}</div>
+            `;
+            chatBox.appendChild(errRow);
+            scrollChat();
+        }
+    }
+
+    /* ==================== MULTILINGUAL GEMINI AI ENGINE ==================== */
+    async function askGemini(text) {
+        const chatBox = document.getElementById('chat');
+
+        if (!API_KEY) {
+            const warnRow = document.createElement('div');
+            warnRow.className = 'msg-row bot-row';
+            warnRow.innerHTML = `
+                <div class="avatar bot-avatar">🐝</div>
+                <div class="msg bot" style="border-color:#FF453A; color:#FF453A;">
+                    No Gemini API key is configured, so I can't reach the AI yet. Set
+                    <code>window.BEE_AI_API_KEY</code> before this script runs (ideally by proxying
+                    requests through your own backend rather than exposing a key in the page).
+                </div>`;
+            chatBox.appendChild(warnRow);
+            scrollChat();
+            return;
+        }
+
+        startThinkingIndicator(chatBox, text);
+
+        try {
+            let currentChat = chats.find(c => c.id === activeChatId);
+            let contents = [];
+
+            if (currentChat && currentChat.messages.length > 0) {
+                // Leave the newest message (the one we're about to answer) out of history —
+                // it gets appended separately below along with any attached image.
+                let recentMsgs = currentChat.messages.slice(-9, -1);
+                recentMsgs.forEach(m => {
+                    if (!m.isImage && m.text) {
+                        const role = m.role === 'User' ? 'user' : 'model';
+                        const last = contents[contents.length - 1];
+                        // Gemini requires strictly alternating user/model turns. If the previous
+                        // turn has the same role (e.g. two bot messages in a row), merge the text
+                        // into it instead of pushing a same-role turn, which the API would reject.
+                        if (last && last.role === role) {
+                            last.parts[0].text += '\n' + m.text;
+                        } else {
+                            contents.push({ role, parts: [{ text: m.text }] });
+                        }
+                    }
+                });
+            }
+
+            let userParts = [{ text: text || "Analyze this image attachment." }];
+            if (base64Image) {
+                userParts.push({
+                    inlineData: {
+                        mimeType: "image/jpeg",
+                        data: base64Image
+                    }
+                });
+            }
+
+            if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+                contents[contents.length - 1].parts.push(...userParts);
+            } else {
+                contents.push({ role: 'user', parts: userParts });
+            }
+
+            const userName = localStorage.getItem('beeUserName');
+            const userLang = localStorage.getItem('beeUserLang');
+            let langInstruction = "Speak fluently in whatever language the user speaks.";
+            if (userLang === 'english') langInstruction = "Reply in English by default.";
+            else if (userLang === 'urdu') langInstruction = "Reply in Urdu by default.";
+
+            // Fold in whatever the user shared during onboarding so Bee AI can answer
+            // personal questions ("what's my favourite colour?") from memory.
+            const profileFacts = [];
+            const awesomeName = localStorage.getItem('beeUserAwesomeName');
+            const favColor = localStorage.getItem('beeUserColor');
+            const favFood = localStorage.getItem('beeUserFood');
+            const userCountry = localStorage.getItem('beeUserCountry');
+            const favCity = localStorage.getItem('beeUserCity');
+            if (awesomeName) profileFacts.push(`their self-chosen "awesome name" is ${awesomeName}`);
+            if (favColor) profileFacts.push(`their favourite colour is ${favColor}`);
+            if (favFood) profileFacts.push(`their favourite food is ${favFood}`);
+            if (userCountry) profileFacts.push(`they are from ${userCountry}`);
+            if (favCity) profileFacts.push(`their favourite city & country to visit is ${favCity}`);
+            const profileInstruction = profileFacts.length
+                ? ` Here is what you already know about the user from onboarding, so you can answer personal questions about them directly instead of asking again: ${profileFacts.join('; ')}.`
+                : '';
+
+            const payload = {
+                contents: contents,
+                systemInstruction: {
+                    parts: [{
+                        text: `You are Bee AI 🐝✨, a smart and friendly AI assistant${userName ? ` talking with ${userName}` : ''}. ${langInstruction}${profileInstruction} Format your text cleanly with bullet points, bold headers, and expressive emojis. Keep your responses engaging, well-structured, and helpful.`
+                    }]
+                }
+            };
+
+            const response = await fetch(GEMINI_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+            stopThinkingIndicator();
+
+            let reply = "Unable to process response.";
+
+            if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+                // A response can legitimately contain multiple text parts; join them all
+                // instead of assuming everything is in parts[0].
+                const parts = data.candidates[0].content.parts || [];
+                const joined = parts.map(p => p.text || '').join('').trim();
+                if (joined) reply = joined;
+            } else if (data.error) {
+                reply = `API Error: ${data.error.message}`;
+            } else if (data.promptFeedback && data.promptFeedback.blockReason) {
+                reply = `The response was blocked (${data.promptFeedback.blockReason}). Try rephrasing your message.`;
+            }
+
+            const replyRow = document.createElement('div');
+            replyRow.className = 'msg-row bot-row';
+            replyRow.innerHTML = `
+                <div class="avatar bot-avatar">🐝</div>
+                <div class="msg bot">${formatMarkdown(reply)}${buildDownloadActions(reply)}</div>
+            `;
+            chatBox.appendChild(replyRow);
+            saveMessage('Bot', reply);
+
+        } catch (e) {
+            stopThinkingIndicator();
+            const errRow = document.createElement('div');
+            errRow.className = 'msg-row bot-row';
+            errRow.innerHTML = `
+                <div class="avatar bot-avatar">🐝</div>
+                <div class="msg bot" style="border-color:#FF453A; color:#FF453A;">Error connecting to Gemini API: ${escapeHtml(e.message)}</div>
+            `;
+            chatBox.appendChild(errRow);
+        }
+        clearImage();
+        scrollChat();
+    }
+</script>
+</body>  
+</html>
